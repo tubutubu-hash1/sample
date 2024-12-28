@@ -1,63 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <title>sample1</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.14.2/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>じゃんけんAI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .button-group {
+            margin-top: 20px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
 </head>
 <body>
-  <input type="button" id="xlsx" value="Excelファイル出力" onclick="func1()">
-  <script language="javascript" type="text/javascript">
-    // 出力するオブジェクト(Array)
-    var array1 =
-      [
-        ["apple", "banana", "cherry"],
-        [1, 2, 3]
-      ];
+    <h1>じゃんけんAI</h1>
+    <div class="button-group">
+        <button onclick="play('グー')">グー</button>
+        <button onclick="play('チョキ')">チョキ</button>
+        <button onclick="play('パー')">パー</button>
+        <button onclick="resetGame()">リセット</button>
+    </div>
+    <div class="result" id="result"></div>
+    <script>
+        let totalGames = 0;
+        let userWins = 0;
+        let aiWins = 0;
+        let draws = 0;
 
-    // SheetをWorkbookに追加する
-    // 参照：https://github.com/SheetJS/js-xlsx/issues/163
-    function sheet_to_workbook(sheet/*:Worksheet*/, opts)/*:Workbook*/ {
-      var n = opts && opts.sheet ? opts.sheet : "Sheet1";
-      var sheets = {}; sheets[n] = sheet;
-      return { SheetNames: [n], Sheets: sheets };
-    }
+        function play(userHand) {
+            const hands = ['グー', 'チョキ', 'パー'];
+            const aiHand = hands[Math.floor(Math.random() * hands.length)];
 
-    // ArrayをWorkbookに変換する
-    // 参照：https://github.com/SheetJS/js-xlsx/issues/163
-    function aoa_to_workbook(data/*:Array<Array<any> >*/, opts)/*:Workbook*/ {
-      return sheet_to_workbook(XLSX.utils.aoa_to_sheet(data, opts), opts);
-    }
+            const outcome = determineWinner(userHand, aiHand);
+            updateResult(userHand, aiHand, outcome);
+            sendResultToServer(userHand, aiHand, outcome);
+        }
 
-    // stringをArrayBufferに変換する
-    // 参照：https://stackoverflow.com/questions/34993292/how-to-save-xlsx-data-to-file-as-a-blob
-    function s2ab(s) {
-      var buf = new ArrayBuffer(s.length);
-      var view = new Uint8Array(buf);
-      for (var i = 0; i != s.length; ++i) view[i] = s.charCodeAt(i) & 0xFF;
-        return buf;
-      }
+        function determineWinner(user, ai) {
+            if (user === ai) return '引き分け';
+            if ((user === 'グー' && ai === 'チョキ') || 
+                (user === 'チョキ' && ai === 'パー') || 
+                (user === 'パー' && ai === 'グー')) {
+                userWins++;
+                return '勝ち';
+            } else {
+                aiWins++;
+                return '負け';
+            }
+        }
 
-    function func1() {
-    // 書き込み時のオプションは以下を参照
-    // https://github.com/SheetJS/js-xlsx/blob/master/README.md#writing-options
-    var write_opts = {
-      type: 'binary'
-    };
+        function updateResult(user, ai, outcome) {
+            totalGames++;
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                あなた: ${user}, AI: ${ai} - 結果: ${outcome}<br>
+                試合数: ${totalGames}, 勝ち: ${userWins}, 負け: ${aiWins}, 引き分け: ${draws}
+            `;
+        }
 
-    // ArrayをWorkbookに変換する
-    var wb = aoa_to_workbook(array1);
-    var wb_out = XLSX.write(wb, write_opts);
+        function sendResultToServer(user, ai, outcome) {
+            fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user, ai, outcome })
+            });
+        }
 
-    // WorkbookからBlobオブジェクトを生成
-    // 参照：https://developer.mozilla.org/ja/docs/Web/API/Blob
-    var blob = new Blob([s2ab(wb_out)], { type: 'application/octet-stream' });
+        function resetGame() {
+            totalGames = userWins = aiWins = draws = 0;
+            document.getElementById('result').innerHTML = '';
+            fetch('/reset', { method: 'POST' });
+        }
 
-    // FileSaverのsaveAs関数で、xlsxファイルとしてダウンロード
-    // 参照：https://github.com/eligrey/FileSaver.js/
-    saveAs(blob, 'myExcelFile.xlsx');
-  }
-  </script>
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
 </body>
 </html>
